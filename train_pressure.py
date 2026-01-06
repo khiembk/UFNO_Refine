@@ -10,9 +10,9 @@ from lploss import LpLoss
 
 
 def load_data():
-    DATA_DIR = 'ufno_data/lite_dataset'
-    train_a = torch.load(f'{DATA_DIR}/dP_test_a_lite10.pt')
-    train_u = torch.load(f'{DATA_DIR}/dP_test_u_lite10.pt')
+    DATA_DIR = 'datasets'
+    train_a = torch.load(f'{DATA_DIR}/dP_test_a_lite.pt')
+    train_u = torch.load(f'{DATA_DIR}/dP_test_u_lite.pt')
     print(train_a.shape)
     print(train_u.shape)
 
@@ -34,7 +34,7 @@ def main():
     mode2 = 10
     mode3 = 10
     width = 36
-    device = torch.device('cuda:1')
+    device = torch.device('cuda')
     model = Net3d(mode1, mode2, mode3, width)
     model.to(device)
     
