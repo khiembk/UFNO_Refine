@@ -84,8 +84,8 @@ def main():
             train_l2 += loss.item()
 
             counter += 1
-            if counter % 100 == 0:
-                print(f'epoch: {ep}, batch: {counter}/{len(train_loader)}, train loss: {loss.item()/batch_size:.4f}')
+            # if counter % 100 == 0:
+            #     print(f'epoch: {ep}, batch: {counter}/{len(train_loader)}, train loss: {loss.item()/batch_size:.4f}')
         
         scheduler.step()
     
