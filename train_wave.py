@@ -5,7 +5,7 @@ from lploss import *
 import os
 torch.manual_seed(0)
 np.random.seed(0)
-
+from models.Seimic_UFNO import SeismicUFNO
 from utils.metric import r2_score, mean_relative_error, evaluate_metrics, masked_mre, masked_r2
 
 def load_data():
@@ -22,20 +22,23 @@ def load_data():
 
 
 @torch.no_grad()
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, batch_size):
     model.eval()
     mre_total = 0.0
     r2_total = 0.0
     n_batches = 0
-
+    lploss = LpLoss(size_average=False)
     for x, y in loader:
         x, y = x.to(device), y.to(device)
 
         pred = model(x).view(-1, 96, 200, 24)
 
         mask = (x[:,:,:,0:1,0] != 0).repeat(1,1,1,24)
+        
+        for i in range(batch_size):
+            mre =+ lploss(pred[i,...][mask[i,...]].reshape(1, -1), y[i,...][mask[i,...]].reshape(1, -1))
 
-        mre = masked_mre(pred, y, mask)
+
         r2 = masked_r2(pred, y, mask)
 
         mre_total += mre.item()
@@ -62,7 +65,7 @@ def main():
     mode3 = 10
     width = 36
     device = torch.device('cuda')
-    model = Net3d(mode1, mode2, mode3, width)
+    model = SeismicUFNO(mode1, mode2, mode3, width)
     model.to(device)
     # prepare for calculating x direction derivatives 
     print("prepapre x...") 
