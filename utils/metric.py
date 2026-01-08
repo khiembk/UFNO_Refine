@@ -47,3 +47,35 @@ def evaluate_metrics(y_pred, y_true):
         "MRE": mre.item(),
         "R2": r2.item()
     }
+
+def masked_mre(pred, target, mask, eps=1e-8):
+    """
+    pred, target: [B, 96, 200, 24]
+    mask:          [B, 96, 200, 24] (bool)
+    """
+    B = pred.shape[0]
+    mre = 0.0
+
+    for i in range(B):
+        p = pred[i][mask[i]]
+        t = target[i][mask[i]]
+
+        mre += torch.mean(torch.abs(p - t) / (torch.abs(t) + eps))
+
+    return mre / B
+
+def masked_r2(pred, target, mask):
+    B = pred.shape[0]
+    r2 = 0.0
+
+    for i in range(B):
+        p = pred[i][mask[i]]
+        t = target[i][mask[i]]
+
+        t_mean = torch.mean(t)
+        ss_res = torch.sum((t - p) ** 2)
+        ss_tot = torch.sum((t - t_mean) ** 2)
+
+        r2 += 1.0 - ss_res / (ss_tot + 1e-8)
+
+    return r2 / B

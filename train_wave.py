@@ -11,7 +11,7 @@ from utils.metric import r2_score, mean_relative_error, evaluate_metrics, masked
 def load_data():
     DATA_DIR = 'datasets'
     a = torch.load(f'{DATA_DIR}/sg_test_a.pt')
-    u = torch.load(f'{DATA_DIR}/sg_test_u.pt')
+    u = torch.load(f'{DATA_DIR}/seismic_test_u.pt')
     
     ntrain = int(0.8 * a.shape[0])
     train_a, val_a = a[:ntrain], a[ntrain:]
@@ -22,23 +22,20 @@ def load_data():
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, batch_size):
+def evaluate(model, loader, device):
     model.eval()
     mre_total = 0.0
     r2_total = 0.0
     n_batches = 0
-    lploss = LpLoss(size_average=False)
+
     for x, y in loader:
         x, y = x.to(device), y.to(device)
 
         pred = model(x).view(-1, 96, 200, 24)
 
         mask = (x[:,:,:,0:1,0] != 0).repeat(1,1,1,24)
-        
-        for i in range(batch_size):
-            mre =+ lploss(pred[i,...][mask[i,...]].reshape(1, -1), y[i,...][mask[i,...]].reshape(1, -1))
 
-
+        mre = masked_mre(pred, y, mask)
         r2 = masked_r2(pred, y, mask)
 
         mre_total += mre.item()
@@ -134,7 +131,7 @@ def main():
         scheduler.step()
     
         
-        val_mre, val_r2 = evaluate(model, val_loader, device, batch_size)
+        val_mre, val_r2 = evaluate(model, val_loader, device)
         print(f'epoch: {ep}, train loss: {train_l2/train_a.shape[0]:.4f}, val mre:{val_mre:.4f}, val r2:{val_r2:.4f}')
         lr_ = optimizer.param_groups[0]['lr']
     
