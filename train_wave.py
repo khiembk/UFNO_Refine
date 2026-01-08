@@ -53,7 +53,7 @@ def save_model(model):
     os.makedirs(save_dir, exist_ok=True)
     torch.save(
     model.state_dict(),
-    f"{save_dir}/gas_saturation_last_model.pt")
+    f"{save_dir}/gas_wave_last_model.pt")
 
 def main():
     print("Load data...")
@@ -100,14 +100,12 @@ def main():
         counter = 0
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
-            dy = (y[:,:,2:,:] - y[:,:,:-2,:])/grid_dx
+            
         
             optimizer.zero_grad()
-        
             mask = (x[:,:,:,0:1,0]!=0).repeat(1,1,1,24)
-            dy = (y[:,:,2:,:] - y[:,:,:-2,:])/grid_dx
             pred = model(x).view(-1,96,200,24)
-            dy_pred = (pred[:,:,2:,:] - pred[:,:,:-2,:])/grid_dx
+            
             ori_loss = 0
             der_loss = 0
         
@@ -115,13 +113,8 @@ def main():
             for i in range(batch_size):
                 ori_loss += myloss(pred[i,...][mask[i,...]].reshape(1, -1), y[i,...][mask[i,...]].reshape(1, -1))
 
-        # 1st derivative loss
-            dy_pred = (pred[:,:,2:,:] - pred[:,:,:-2,:])/grid_dx
-            mask_dy = mask[:,:,:198,:]
-            for i in range(batch_size):
-                der_loss += myloss(dy_pred[i,...][mask_dy[i,...]].reshape(1, -1), dy[i,...][mask_dy[i,...]].view(1, -1))
 
-            loss = ori_loss + 0.5 * der_loss
+            loss = ori_loss 
         
             loss.backward()
             optimizer.step()
