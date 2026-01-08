@@ -2,24 +2,59 @@ import torch
 import numpy as np
 from ufno import *
 from lploss import *
-
+import os
 torch.manual_seed(0)
 np.random.seed(0)
 
+from utils.metric import r2_score, mean_relative_error, evaluate_metrics, masked_mre, masked_r2
 
 def load_data():
     DATA_DIR = 'datasets'
+    a = torch.load(f'{DATA_DIR}/sg_test_a.pt')
+    u = torch.load(f'{DATA_DIR}/sg_test_u.pt')
+    
+    ntrain = int(0.8 * a.shape[0])
+    train_a, val_a = a[:ntrain], a[ntrain:]
+    train_u, val_u = u[:ntrain], u[ntrain:]
+    print("Train:", train_a.shape, train_u.shape)
+    print("Val  :", val_a.shape, val_u.shape)
+    return train_a, train_u, val_a, val_u
 
-    train_a = torch.load(f'{DATA_DIR}/sg_test_a.pt')
-    train_u = torch.load(f'{DATA_DIR}/sg_test_u.pt')
-    print(train_a.shape)
-    print(train_u.shape)
 
-    return train_a, train_u
+@torch.no_grad()
+def evaluate(model, loader, device):
+    model.eval()
+    mre_total = 0.0
+    r2_total = 0.0
+    n_batches = 0
+
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)
+
+        pred = model(x).view(-1, 96, 200, 24)
+
+        mask = (x[:,:,:,0:1,0] != 0).repeat(1,1,1,24)
+
+        mre = masked_mre(pred, y, mask)
+        r2 = masked_r2(pred, y, mask)
+
+        mre_total += mre.item()
+        r2_total += r2.item()
+        n_batches += 1
+
+    return mre_total / n_batches, r2_total / n_batches
+
+
+def save_model(model):
+    save_dir = "checkpoints"
+    os.makedirs(save_dir, exist_ok=True)
+    torch.save(
+    model.state_dict(),
+    f"{save_dir}/gas_saturation_last_model.pt")
 
 def main():
     print("Load data...")
-    train_a, train_u = load_data()
+    train_a, train_u, val_a, val_u = load_data()
 
     print("create model...")
     mode1 = 10
@@ -44,7 +79,13 @@ def main():
     scheduler_gamma = 0.9
 
     batch_size = 4
+    print("load_train loader and val loader...")
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_a, train_u), batch_size=batch_size, shuffle=True)
+    val_loader = torch.utils.data.DataLoader(
+    torch.utils.data.TensorDataset(val_a, val_u),
+    batch_size=batch_size,
+    shuffle=False
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     myloss = LpLoss(size_average=False)
@@ -89,10 +130,13 @@ def main():
         
         scheduler.step()
     
-        print(f'epoch: {ep}, train loss: {train_l2/train_a.shape[0]:.4f}')
-    
+        
+        val_mre, val_r2 = evaluate(model, val_loader, device)
+        print(f'epoch: {ep}, train loss: {train_l2/train_a.shape[0]:.4f}, val mre:{val_mre:.4f}, val r2:{val_r2:.4f}')
         lr_ = optimizer.param_groups[0]['lr']
-       
+    
+    print("save model...")
+    save_model(model)   
 
 if __name__ == "__main__":
     main()
