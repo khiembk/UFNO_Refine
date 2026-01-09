@@ -184,13 +184,31 @@ def train_gas_model():
     save_gas_model(model)
     return model   
 
-
-def main():
-    gas_model = train_gas_model()
+def load_gas_model_pre_trained():
     mode1 = 10
     mode2 = 10
     mode3 = 10
     width = 36
+    device = torch.device('cuda')
+    model = Net3d_encode(mode1, mode2, mode3, width)
+    
+    state_dict = torch.load(
+    "checkpoints/gas_saturation_last_model.pt",
+    map_location=device)
+    model.load_state_dict(state_dict)
+    model.to(device)
+    return model
+
+
+def main():
+    #gas_model = train_gas_model()
+    gas_model = load_gas_model_pre_trained()
+    #gas_model.to(device)
+    mode1 = 10
+    mode2 = 10
+    mode3 = 10
+    width = 36
+    print("create couple model")
     device = torch.device('cuda')
     coupled_model  =  Coupled_Model(mode1, mode2, mode3, width, gas_model)
     coupled_model.to(device)
