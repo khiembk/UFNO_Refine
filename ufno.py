@@ -218,7 +218,7 @@ class Net3d(nn.Module):
     
 class Net3d_encode(nn.Module):
     def __init__(self, modes1, modes2, modes3, width):
-        super(Net3d, self).__init__()
+        super(Net3d_encode, self).__init__()
         self.conv1 = SimpleBlock3d(modes1, modes2, modes3, width)
 
     def encode(self, x):

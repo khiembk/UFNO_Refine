@@ -1,7 +1,8 @@
 from ufno import Net3d
 import torch 
 import torch.nn as nn 
-from Seimic_UFNO import SeismicUFNO, SeismicUFNO_encode
+
+from models.Seimic_UFNO import SeismicUFNO_encode
 
 
 def freeze(model):
@@ -46,5 +47,4 @@ class Coupled_Model(nn.Module):
         feat = torch.cat([s_feat, t_feat], dim=1)
         feat = self.fuse(feat)
         out = self.main_model.decode(feat)
-
         return out
