@@ -31,15 +31,13 @@ def evaluate(model, loader, device, batch_size):
     for x, y in loader:
         x, y = x.to(device), y.to(device)
 
-        pred = model(x).view(-1, 96, 200, 24)
+        pred = model(x)
 
-        mask = (x[:,:,:,0:1,0] != 0).repeat(1,1,1,24)
-        
-        for i in range(batch_size):
-            mre =+ lploss(pred[i,...][mask[i,...]].reshape(1, -1), y[i,...][mask[i,...]].reshape(1, -1))
+        mre = lploss(pred.reshape(pred.shape[0], -1),
+            y.reshape(y.shape[0], -1))
 
-
-        r2 = masked_r2(pred, y, mask)
+        r2 = r2_score(pred.reshape(pred.shape[0], -1),
+            y.reshape(y.shape[0], -1))
 
         mre_total += mre.item()
         r2_total += r2.item()
@@ -94,6 +92,7 @@ def main():
     myloss = LpLoss(size_average=False)
 
     train_l2 = 0.0
+    print("Begin training...")
     for ep in range(1,epochs+1):
         model.train()
         train_l2 = 0
@@ -103,19 +102,13 @@ def main():
             
         
             optimizer.zero_grad()
-            mask = (x[:,:,:,0:1,0]!=0).repeat(1,1,1,24)
-            pred = model(x).view(-1,96,200,24)
             
-            ori_loss = 0
-            der_loss = 0
-        
-        # original loss
-            for i in range(batch_size):
-                ori_loss += myloss(pred[i,...][mask[i,...]].reshape(1, -1), y[i,...][mask[i,...]].reshape(1, -1))
-
-
-            loss = ori_loss 
-        
+            pred = model(x)
+            
+            loss = myloss(
+            pred.reshape(pred.shape[0], -1),
+            y.reshape(y.shape[0], -1)
+        )
             loss.backward()
             optimizer.step()
             train_l2 += loss.item()
@@ -127,7 +120,7 @@ def main():
         scheduler.step()
     
         
-        val_mre, val_r2 = evaluate(model, val_loader, device)
+        val_mre, val_r2 = evaluate(model, val_loader, device, batch_size)
         print(f'epoch: {ep}, train loss: {train_l2/train_a.shape[0]:.4f}, val mre:{val_mre:.4f}, val r2:{val_r2:.4f}')
         lr_ = optimizer.param_groups[0]['lr']
     
