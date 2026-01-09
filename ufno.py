@@ -251,7 +251,15 @@ class Net3d_encode(nn.Module):
             x = F.relu(x)
 
         return x[..., :-8, :-8, :-8]  # remove padding
-
+    
+    def decode(self, x):
+        x = x.permute(0, 2, 3, 4, 1)
+        x = self.conv1.fc1(x)
+        x = F.relu(x)
+        x = self.conv1.fc2(x)
+        return x.squeeze(-1)
+    
+    
     def forward(self, x):
         x = self.encode(x)
         x = x.permute(0, 2, 3, 4, 1)

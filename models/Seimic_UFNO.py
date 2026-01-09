@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from ufno import Net3d
+from ufno import Net3d, Net3d_encode
 
 
 class SeismicUFNO(nn.Module):
@@ -21,6 +21,102 @@ class SeismicUFNO(nn.Module):
         self.pool_x = nn.AdaptiveAvgPool1d(101)  # receivers
 
     def forward(self, x):
+        """
+        x: [B, 96, 200, 24, 12]
+        return: [B, 24, 151, 101]
+        """
+
+        # UFNO forward
+        # → [B, 96, 200, 24]
+        field = self.ufno(x)
+
+        B, Z, X, T = field.shape
+
+        # Move time to front
+        field = field.permute(0, 3, 1, 2)  # [B, 24, 96, 200]
+
+        seismic = []
+
+        for t in range(T):
+            ft = field[:, t:t+1, :, :]      # [B, 1, 96, 200]
+            ft = self.receiver_proj(ft)     # [B, 1, 96, 200]
+
+            # Collapse depth (z)
+            ft = ft.mean(dim=2)              # [B, 1, 200]
+
+            # Map x → receivers
+            ft = self.pool_x(ft)             # [B, 1, 101]
+
+            seismic.append(ft)
+
+        # Stack time
+        seismic = torch.stack(seismic, dim=1)  # [B, 24, 1, 101]
+        seismic = seismic.squeeze(2)            # [B, 24, 101]
+
+        # Add time interpolation
+        seismic = seismic.unsqueeze(2)           # [B, 24, 1, 101]
+        seismic = nn.functional.interpolate(
+            seismic,
+            size=(151, 101),
+            mode="bilinear",
+            align_corners=False
+        ).squeeze(2)
+
+        return seismic
+    
+class SeismicUFNO_encode(nn.Module):
+    def __init__(self, mode1, mode2, mode3, width):
+        super().__init__()
+
+        # UFNO backbone (unchanged)
+        self.ufno = Net3d_encode(mode1, mode2, mode3, width)
+
+        # Project spatial grid → receivers
+        self.receiver_proj = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Conv2d(32, 1, kernel_size=1)
+        )
+
+        # Learnable receiver aggregation
+        self.pool_x = nn.AdaptiveAvgPool1d(101)  # receivers
+    
+    def encode(self,x):
+        return self.ufno.encode(x)
+    
+    def decode(self, latent):
+        """
+        latent: [B, width, 96, 200, 24]
+        return: [B, 24, 151, 101]
+        """
+
+        # Project width → scalar field
+        field = self.ufno.decode(latent)   # [B, 96, 200, 24]
+
+        B, Z, X, T = field.shape
+        field = field.permute(0, 3, 1, 2)  # [B, 24, 96, 200]
+
+        seismic = []
+        for t in range(T):
+            ft = field[:, t:t+1, :, :]
+            ft = self.receiver_proj(ft)
+            ft = ft.mean(dim=2)            # collapse depth
+            ft = self.pool_x(ft)
+            seismic.append(ft)
+
+        seismic = torch.stack(seismic, dim=1).squeeze(2)
+        seismic = nn.functional.interpolate(
+            seismic.unsqueeze(2),
+            size=(151, 101),
+            mode="bilinear",
+            align_corners=False
+        ).squeeze(2)
+
+        return seismic
+    
+
+    def forward(self, x):
+
         """
         x: [B, 96, 200, 24, 12]
         return: [B, 24, 151, 101]
