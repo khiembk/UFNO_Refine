@@ -215,3 +215,47 @@ class Net3d(nn.Module):
             c += reduce(operator.mul, list(p.size()))
 
         return c
+    
+class Net3d_encode(nn.Module):
+    def __init__(self, modes1, modes2, modes3, width):
+        super(Net3d, self).__init__()
+        self.conv1 = SimpleBlock3d(modes1, modes2, modes3, width)
+
+    def encode(self, x):
+        """
+        Returns latent field before final projection
+        Output: [B, width, X, Y, T]
+        """
+        batchsize = x.shape[0]
+        size_x, size_y, size_z = x.shape[1], x.shape[2], x.shape[3]
+
+        x = F.pad(F.pad(x, (0,0,0,8,0,8), "replicate"),
+                  (0,0,0,0,0,0,0,8), 'constant', 0)
+
+        # ---- manual forward of SimpleBlock3d ----
+        x = self.conv1.fc0(x)
+        x = x.permute(0, 4, 1, 2, 3)
+
+        for i in range(6):
+            conv = getattr(self.conv1, f"conv{i}")
+            w = getattr(self.conv1, f"w{i}")
+            unet = getattr(self.conv1, f"unet{i}", None)
+
+            x1 = conv(x)
+            x2 = w(x.view(batchsize, self.conv1.width, -1)) \
+                    .view_as(x)
+
+            x = x1 + x2
+            if unet is not None:
+                x = x + unet(x)
+            x = F.relu(x)
+
+        return x[..., :-8, :-8, :-8]  # remove padding
+
+    def forward(self, x):
+        x = self.encode(x)
+        x = x.permute(0, 2, 3, 4, 1)
+        x = self.conv1.fc1(x)
+        x = F.relu(x)
+        x = self.conv1.fc2(x)
+        return x.squeeze(-1)
