@@ -41,8 +41,8 @@ class Coupled_Model(nn.Module):
         t_feat = self.feature_proj(t_feat)
 
         s_feat = self.main_model.encode(x)
-        print("sfeat:", s_feat.shape)
-        print("t_feat:",t_feat.shape)
+        # print("sfeat:", s_feat.shape)
+        # print("t_feat:",t_feat.shape)
         assert s_feat.shape == t_feat.shape
         feat = torch.cat([s_feat, t_feat], dim=1)
         feat = self.fuse(feat)
