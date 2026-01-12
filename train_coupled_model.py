@@ -23,8 +23,9 @@ def load_gen_data():
     u = torch.load(f'{DATA_DIR}/seismic_test_u.pt')
     
     ntrain = int(0.8 * a.shape[0])
-    train_a, val_a = a[:ntrain], a[ntrain:]
-    train_u, val_u = u[:ntrain], u[ntrain:]
+    ntrain_1 = int(0.95 * a.shape[0])
+    train_a, val_a = a, a[ntrain:]
+    train_u, val_u = u, u[ntrain:]
     print("Train:", train_a.shape, train_u.shape)
     print("Val  :", val_a.shape, val_u.shape)
     return train_a, train_u, val_a, val_u
@@ -89,7 +90,7 @@ def evaluate_coupled_model(model, loader, device, batch_size):
         r2_total += r2.item()
         n_batches += 1
 
-    return mre_total / n_batches, r2_total / n_batches
+    return mre_total / (n_batches*batch_size), r2_total / n_batches
 
 def save_gas_model(model):
     save_dir = "checkpoints"
@@ -100,6 +101,7 @@ def save_gas_model(model):
 
 def train_gas_model():
     print("Load data...")
+
     train_a, train_u, val_a, val_u = load_gas_data()
 
     print("create model...")
