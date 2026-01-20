@@ -65,7 +65,7 @@ def evaluate_gas_model(model, loader, device, batch_size):
 
         mre_total += mre.item()
         r2_total += r2.item()
-        n_batches += 1
+        n_batches += batch_size
 
     return mre_total / n_batches, r2_total / n_batches
 @torch.no_grad()
@@ -88,9 +88,9 @@ def evaluate_coupled_model(model, loader, device, batch_size):
 
         mre_total += mre.item()
         r2_total += r2.item()
-        n_batches += 1
+        n_batches += batch_size
 
-    return mre_total / (n_batches*batch_size), r2_total / n_batches
+    return mre_total / n_batches, r2_total / n_batches
 
 def save_gas_model(model):
     save_dir = "checkpoints"
@@ -135,7 +135,7 @@ def train_gas_model():
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
-    myloss = LpLoss(size_average=False)
+    myloss = NormalizedMRELoss()
 
     train_l2 = 0.0
     for ep in range(1,epochs+1):
@@ -214,8 +214,8 @@ class NormalizedMRELoss(torch.nn.Module):
 
 
 def main():
-    #gas_model = train_gas_model()
-    gas_model = load_gas_model_pre_trained()
+    gas_model = train_gas_model()
+    #gas_model = load_gas_model_pre_trained()
     #gas_model.to(device)
     mode1 = 10
     mode2 = 10

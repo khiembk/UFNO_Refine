@@ -41,7 +41,7 @@ def evaluate(model, loader, device, batch_size):
 
         mre_total += mre.item()
         r2_total += r2.item()
-        n_batches += 1
+        n_batches += batch_size
 
     return mre_total / n_batches, r2_total / n_batches
 
