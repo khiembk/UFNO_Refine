@@ -1,5 +1,7 @@
 import torch 
 from utils.metric import NormalizedMRELoss
+from models.LLM_Bridge import LLMTeacher, CoupledWaveModel
+from transformers import AutoTokenizer, AutoModel
 
 class SeismicDataset(torch.utils.data.Dataset):
     def __init__(self, sg, seismic, llm_embeddings):
@@ -68,3 +70,5 @@ def train_wave_with_llm_teacher(
         print(f"Epoch {ep:04d} | Loss {total / len(loader):.4e}")
 
     return model
+
+
