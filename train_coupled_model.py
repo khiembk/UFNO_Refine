@@ -74,7 +74,7 @@ def evaluate_coupled_model(model, loader, device, batch_size):
     mre_total = 0.0
     r2_total = 0.0
     n_batches = 0
-    lploss = LpLoss(size_average=False)
+    lploss = NormalizedMRELoss()
     for x, y in loader:
         x, y = x.to(device), y.to(device)
 
@@ -201,6 +201,17 @@ def load_gas_model_pre_trained():
     model.to(device)
     return model
 
+class NormalizedMRELoss(torch.nn.Module):
+    def __init__(self, p=2, eps=1e-8):
+        super().__init__()
+        self.p = p
+        self.eps = eps
+
+    def forward(self, pred, target):
+        num = torch.norm(pred - target, p=self.p)
+        den = torch.norm(target, p=self.p) + self.eps
+        return num / den
+
 
 def main():
     #gas_model = train_gas_model()
@@ -237,7 +248,7 @@ def main():
     )
     optimizer = torch.optim.Adam(coupled_model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
-    myloss = LpLoss(size_average=False)
+    myloss = NormalizedMRELoss()
 
     train_l2 = 0.0
     print("Begin training...")

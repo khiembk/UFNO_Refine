@@ -79,3 +79,15 @@ def masked_r2(pred, target, mask):
         r2 += 1.0 - ss_res / (ss_tot + 1e-8)
 
     return r2 / B
+
+
+class NormalizedMRELoss(torch.nn.Module):
+    def __init__(self, p=2, eps=1e-8):
+        super().__init__()
+        self.p = p
+        self.eps = eps
+
+    def forward(self, pred, target):
+        num = torch.norm(pred - target, p=self.p)
+        den = torch.norm(target, p=self.p) + self.eps
+        return num / den

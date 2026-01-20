@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from lploss import LpLoss
-from utils.metric import r2_score
 import numpy as np
+from torch.utils.data import random_split
 
 def compress_sg(sg):
     # sg: [96, 200, 24, 12]
@@ -71,34 +71,90 @@ class SeismicPINN(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+class NormalizedMRELoss(torch.nn.Module):
+    def __init__(self, p=2, eps=1e-8):
+        super().__init__()
+        self.p = p
+        self.eps = eps
 
-def train_seismic_pinn(sg, target, device="cuda"):
+    def forward(self, pred, target):
+        num = torch.norm(pred - target, p=self.p)
+        den = torch.norm(target, p=self.p) + self.eps
+        return num / den
+
+
+
+
+def train_seismic_pinn(
+    sg, target,
+    device="cuda",
+    epochs=100,
+    batch_size=4
+):
     dataset = SeismicPINNDataset(sg, target)
-    loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
+
+    # 80 / 20 split
+    n_total = len(dataset)
+    n_train = int(0.8 * n_total)
+    n_val = n_total - n_train
+
+    train_set, val_set = torch.utils.data.random_split(
+        dataset, [n_train, n_val]
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        train_set, batch_size=batch_size, shuffle=True
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_set, batch_size=batch_size, shuffle=False
+    )
 
     model = SeismicPINN().to(device)
     opt = torch.optim.Adam(model.parameters(), lr=1e-4)
-    loss_fn = nn.MSELoss()
 
-    for epoch in range(2000):
-        total = 0.0
-        for x, y in loader:
-            x = x.squeeze(0).to(device)
-            y = y.squeeze(0).to(device)
+    loss_fn = NormalizedMRELoss(p=2)
+
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0.0
+
+        for x, y in train_loader:
+            x = x.to(device)   # [B, 96, 200, 24, 12]
+            y = y.to(device)   # [B, 24, 151, 101]
 
             pred = model(x)
+
             loss = loss_fn(pred, y)
 
             opt.zero_grad()
             loss.backward()
             opt.step()
 
-            total += loss.item()
+            train_loss += loss.item()
 
-        if epoch % 100 == 0:
-            print(f"Epoch {epoch} | Loss {total/len(loader):.4e}")
+        train_loss /= len(train_loader)
+
+        # ---- validation ----
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for x, y in val_loader:
+                x = x.to(device)
+                y = y.to(device)
+
+                pred = model(x)
+                val_loss += loss_fn(pred, y).item()
+
+        val_loss /= len(val_loader)
+
+        print(
+            f"Epoch {epoch:04d} | "
+            f"Train NMRE {train_loss:.4e} | "
+            f"Val NMRE {val_loss:.4e}"
+        )
 
     return model
+
 
 
 

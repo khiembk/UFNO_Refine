@@ -6,7 +6,7 @@ import os
 torch.manual_seed(0)
 np.random.seed(0)
 from models.Seimic_UFNO import SeismicUFNO
-from utils.metric import r2_score, mean_relative_error, evaluate_metrics, masked_mre, masked_r2
+from utils.metric import r2_score, mean_relative_error, evaluate_metrics, masked_mre, masked_r2,NormalizedMRELoss
 
 def load_data():
     DATA_DIR = 'datasets'
@@ -27,7 +27,7 @@ def evaluate(model, loader, device, batch_size):
     mre_total = 0.0
     r2_total = 0.0
     n_batches = 0
-    lploss = LpLoss(size_average=False)
+    lploss = NormalizedMRELoss()
     for x, y in loader:
         x, y = x.to(device), y.to(device)
 
@@ -89,7 +89,7 @@ def main():
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
-    myloss = LpLoss(size_average=False)
+    myloss = NormalizedMRELoss()
 
     train_l2 = 0.0
     print("Begin training...")
