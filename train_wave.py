@@ -6,7 +6,8 @@ import os
 torch.manual_seed(0)
 np.random.seed(0)
 from models.Seimic_UFNO import SeismicUFNO
-from utils.metric import r2_score, mean_relative_error, evaluate_metrics, masked_mre, masked_r2,NormalizedMRELoss
+from utils.metric import r2_score, mean_relative_error, evaluate_metrics, masked_mre, masked_r2,NormalizedMRELoss, count_parameters
+import time
 
 def load_data():
     DATA_DIR = 'datasets'
@@ -127,5 +128,51 @@ def main():
     print("save model...")
     save_model(model)   
 
+def measure_inference_time():
+    device = "cuda"
+    print("measure processing time")
+    print("load data...")
+    DATA_DIR = 'datasets'
+    a = torch.load(f'{DATA_DIR}/sg_test_a.pt')
+    u = torch.load(f'{DATA_DIR}/seismic_test_u.pt')
+    train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(a, u), batch_size= 4, shuffle=True)
+    print("init model...")
+    mode1 = 10
+    mode2 = 10
+    mode3 = 10
+    width = 36
+    device = torch.device('cuda')
+    model = SeismicUFNO(mode1, mode2, mode3, width).to(device)
+    model.eval()
+    print("UFNO params: ", count_parameters(model))
+    model.eval()
+   
+    
+    x, y = next(iter(train_loader))
+    x = x.to(device)
+
+    with torch.no_grad():
+        for _ in range(5):
+            _ = model(x)
+
+    torch.cuda.synchronize()
+
+    # -------------------------
+    # Measure inference time
+    # -------------------------
+    start = time.time()
+
+    with torch.no_grad():
+        _ = model(x)
+
+    torch.cuda.synchronize()
+    end = time.time()
+
+    elapsed = end - start
+
+    print(f"Inference time (1 batch, B={x.shape[0]}): {elapsed*1000:.3f} ms")
+    print(f"Per-sample time: {elapsed*1000/x.shape[0]:.3f} ms")
+
 if __name__ == "__main__":
-    main()
+    measure_inference_time()
+    #main()

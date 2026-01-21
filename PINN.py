@@ -3,7 +3,9 @@ import torch.nn as nn
 from lploss import LpLoss
 import numpy as np
 from torch.utils.data import random_split
-from utils.metric import r2_score
+from utils.metric import r2_score, count_trainable_parameters
+import time
+
 def compress_sg(sg):
     # sg: [96, 200, 24, 12]
     # output: [24, 12]
@@ -173,5 +175,48 @@ def train():
     device="cuda"
     )
 
+def measure_inference_time():
+    device = "cuda"
+    print("measure processing time")
+    print("load data...")
+    DATA_DIR = 'datasets'
+    a = torch.load(f'{DATA_DIR}/sg_test_a.pt')
+    u = torch.load(f'{DATA_DIR}/seismic_test_u.pt')
+    dataset = SeismicPINNDataset(a, u)
+    print("init model...")
+    model = SeismicPINN().to(device)
+    model.eval()
+    train_loader = torch.utils.data.DataLoader(
+        dataset, batch_size=4, shuffle=True
+    )
+    
+    x, y = next(iter(train_loader))
+    x = x.to(device)
+
+    with torch.no_grad():
+        for _ in range(5):
+            _ = model(x)
+
+    torch.cuda.synchronize()
+
+    # -------------------------
+    # Measure inference time
+    # -------------------------
+    start = time.time()
+
+    with torch.no_grad():
+        _ = model(x)
+
+    torch.cuda.synchronize()
+    end = time.time()
+
+    elapsed = end - start
+
+    print(f"Inference time (1 batch, B={x.shape[0]}): {elapsed*1000:.3f} ms")
+    print(f"Per-sample time: {elapsed*1000/x.shape[0]:.3f} ms")
+
+
+
 if  __name__ == "__main__":
-    train()
+    #train()
+    measure_inference_time()
