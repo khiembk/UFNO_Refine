@@ -1,70 +1,77 @@
 import torch
 import torch.nn as nn
+from transformers import RobertaModel, RobertaTokenizer
 
 
-class LLMTeacher(nn.Module):
+class RobertaTeacher(nn.Module):
     """
-    LLM-based teacher that provides semantic guidance
+    Frozen RoBERTa teacher for semantic guidance
     """
 
-    def __init__(self, llm_dim=768, out_dim=36):
+    def __init__(self, model_name="roberta-base", out_dim=36):
         super().__init__()
 
+        self.tokenizer = RobertaTokenizer.from_pretrained(model_name)
+        self.llm = RobertaModel.from_pretrained(model_name)
+
+        # Freeze RoBERTa
+        for p in self.llm.parameters():
+            p.requires_grad = False
+        self.llm.eval()
+
+        # Adapter (trainable)
         self.adapter = nn.Sequential(
-            nn.Linear(llm_dim, 128),
+            nn.Linear(self.llm.config.hidden_size, 128),
             nn.GELU(),
             nn.Linear(128, out_dim)
         )
 
-        # Teacher is frozen
-        for p in self.parameters():
-            p.requires_grad = False
-
-    def forward(self, llm_embedding):
+    @torch.no_grad()
+    def encode_text(self, texts, device):
         """
-        llm_embedding: [B, llm_dim]
-        return:        [B, out_dim]
+        texts: list[str]
+        return: [B, 768]
         """
-        return self.adapter(llm_embedding)
+        tokens = self.tokenizer(
+            texts,
+            padding=True,
+            truncation=True,
+            return_tensors="pt"
+        ).to(device)
 
+        outputs = self.llm(**tokens)
+        cls_emb = outputs.last_hidden_state[:, 0]  # [B, 768]
+        return cls_emb
 
-class WaveStudent(nn.Module):
-    def __init__(self, in_dim, width=64):
-        super().__init__()
+    def forward(self, texts, device):
+        """
+        texts: list[str]
+        return: [B, out_dim]
+        """
+        with torch.no_grad():
+            cls_emb = self.encode_text(texts, device)
 
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, width),
-            nn.GELU(),
-            nn.Linear(width, width),
-            nn.GELU(),
-            nn.Linear(width, 1)
-        )
-
-    def forward(self, x):
-        return self.net(x)
+        return self.adapter(cls_emb)
 
 class CoupledWaveModel(nn.Module):
-    def __init__(self, teacher, sg_dim, llm_feat_dim):
+    def __init__(self, teacher, student, sg_dim, llm_feat_dim):
         super().__init__()
 
-        self.teacher = teacher
+        self.teacher = teacher  # RobertaTeacher
 
-        # fuse sg + teacher features
         self.fusion = nn.Sequential(
             nn.Linear(sg_dim + llm_feat_dim, 64),
             nn.GELU()
         )
 
-        self.student = WaveStudent(64)
-
-    def forward(self, sg_feat, llm_embedding):
+        self.student = student
+    def forward(self, sg_feat, texts, device):
         """
-        sg_feat:        [B, sg_dim]
-        llm_embedding:  [B, llm_dim]
+        sg_feat: [B, sg_dim]
+        texts:   list[str] (length B)
         """
 
-        with torch.no_grad():
-            teacher_feat = self.teacher(llm_embedding)
+        teacher_feat = self.teacher(texts, device)  # [B, llm_feat_dim]
 
         x = torch.cat([sg_feat, teacher_feat], dim=1)
         x = self.fusion(x)
