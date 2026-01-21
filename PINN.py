@@ -3,7 +3,7 @@ import torch.nn as nn
 from lploss import LpLoss
 import numpy as np
 from torch.utils.data import random_split
-
+from utils.metric import r2_score
 def compress_sg(sg):
     # sg: [96, 200, 24, 12]
     # output: [24, 12]
@@ -137,6 +137,8 @@ def train_seismic_pinn(
         # ---- validation ----
         model.eval()
         val_loss = 0.0
+        r_2_loss = 0.0
+        
         with torch.no_grad():
             for x, y in val_loader:
                 x = x.to(device)
@@ -144,13 +146,14 @@ def train_seismic_pinn(
 
                 pred = model(x)
                 val_loss += loss_fn(pred, y).item()
-
+                r_2_loss += r2_score(pred, y)
         val_loss /= len(val_loader)
-
+        r_2_loss /= len(val_loader)
         print(
             f"Epoch {epoch:04d} | "
             f"Train NMRE {train_loss:.4e} | "
-            f"Val NMRE {val_loss:.4e}"
+            f"Val NMRE {val_loss:.4e} | "
+            f"Val R2 {r_2_loss:.4e}"
         )
 
     return model
