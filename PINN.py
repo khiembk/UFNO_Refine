@@ -94,7 +94,8 @@ def train_seismic_pinn(
     batch_size=4
 ):
     dataset = SeismicPINNDataset(sg, target)
-
+    print("x_shape: ", sg.size())
+    print("y_shape: ",target.size())
     # 80 / 20 split
     n_total = len(dataset)
     n_train = int(0.8 * n_total)
@@ -121,8 +122,8 @@ def train_seismic_pinn(
         train_loss = 0.0
 
         for x, y in train_loader:
-            x = x.to(device)   # [B, 96, 200, 24, 12]
-            y = y.to(device)   # [B, 24, 151, 101]
+            x = x.to(device)  
+            y = y.to(device)   
 
             pred = model(x)
 
@@ -181,7 +182,7 @@ def measure_inference_time():
     print("load data...")
     DATA_DIR = 'datasets'
     a = torch.load(f'{DATA_DIR}/sg_test_a.pt')
-    u = torch.load(f'{DATA_DIR}/seismic_test_u.pt')
+    u = torch.load(f'{DATA_DIR}/sesismic_coarse_u_15.pt')
     dataset = SeismicPINNDataset(a, u)
     print("init model...")
     model = SeismicPINN().to(device)
@@ -218,5 +219,5 @@ def measure_inference_time():
 
 
 if  __name__ == "__main__":
-    #train()
-    measure_inference_time()
+    train()
+    #measure_inference_time()

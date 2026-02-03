@@ -12,7 +12,7 @@ import time
 def load_data():
     DATA_DIR = 'datasets'
     a = torch.load(f'{DATA_DIR}/sg_test_a.pt')
-    u = torch.load(f'{DATA_DIR}/seismic_test_u.pt')
+    u = torch.load(f'{DATA_DIR}/seismic_coarse_ut_20.pt')
     
     ntrain = int(0.8 * a.shape[0])
     train_a, val_a = a[:ntrain], a[ntrain:]
@@ -174,5 +174,5 @@ def measure_inference_time():
     print(f"Per-sample time: {elapsed*1000/x.shape[0]:.3f} ms")
 
 if __name__ == "__main__":
-    measure_inference_time()
-    #main()
+    #measure_inference_time()
+    main()

@@ -113,7 +113,7 @@ def train_gas_roberta_teacher(epochs = 100):
     optimizer = torch.optim.Adam(teacher.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     myloss = NormalizedMRELoss()
-
+    
     print("Begin gas pretraining (RoBERTa teacher)...")
     for ep in range(1, epochs + 1):
         teacher.train()
@@ -231,7 +231,7 @@ def evaluate_gas_teacher_roberta(teacher, loader, device):
 
 def main():
     # 1) pretrain RoBERTa teacher on gas data
-    gas_teacher = train_gas_roberta_teacher(epochs=1)
+    gas_teacher = train_gas_roberta_teacher(epochs=20)
 
     # 2) freeze + train coupled wave model on wave/seismic data
     device = torch.device("cuda")
